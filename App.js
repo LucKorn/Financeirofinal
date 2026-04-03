@@ -30,7 +30,7 @@ export default function App() {
     erro: '#FF4D4F'
   };
 
-  const categorias = ["Supermercado", "Banco", "Higiene/Gasto pessoal", "Combustível", "Lazer", "Carro", "Saúde", "Dívidas", "Outros"];
+  const categorias = ["Supermercado", "Banco",  "Cartão de Crédito", "Higiene/Gasto pessoal", "Combustível", "Lazer", "Carro", "Saúde", "Dívidas", "Outros"];
   const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   const idMes = `${mesAtual.getMonth()}-${mesAtual.getFullYear()}`;
 
