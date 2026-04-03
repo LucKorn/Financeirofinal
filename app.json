@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Financeiro Luciano",
+    "slug": "financeiro-luciano",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#F4F4F9"
+    },
+    "android": {
+      "package": "com.luciano.financeiro",
+      "adaptiveIcon": {
+        "backgroundColor": "#3A506B"
+      }
+    }
+  }
+}
