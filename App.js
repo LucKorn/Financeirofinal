@@ -1,16 +1,22 @@
-/* PROJETO: CONTROLE FINANCEIRO LUCIANO - V31.1
+/* PROJETO: CONTROLE FINANCEIRO LUCIANO - V31.2
    DATA: MARÇO DE 2026
-   FOCO: EXCLUSÃO, NAVEGAÇÃO ELEVADA E ENTRADA CALCULADA (=SUM)
+   FOCO: SPLASH SCREEN PERSISTENTE E CÁLCULOS MATEMÁTICOS
 */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import * as SplashScreen from 'expo-splash-screen'; // Controle da tela de abertura
 import { 
   StyleSheet, Text, View, TouchableOpacity, FlatList, 
   TextInput, ScrollView, SafeAreaView, Modal, Alert 
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Impede a Splash de sumir sozinha no início
+SplashScreen.preventAutoHideAsync();
+
 export default function App() {
+  // --- ESTADOS DO APP ---
+  const [appPronto, setAppPronto] = useState(false);
   const [tela, setTela] = useState('Inicio');
   const [gastos, setGastos] = useState([]);
   const [entradasMensais, setEntradasMensais] = useState({});
@@ -30,34 +36,42 @@ export default function App() {
     erro: '#FF4D4F'
   };
 
-  const categorias = ["Supermercado", "Banco",  "Cartão de Crédito", "Higiene/Gasto pessoal", "Combustível", "Lazer", "Carro", "Saúde", "Dívidas", "Outros"];
+  const categorias = ["Supermercado", "Banco", "Cartão de Crédito", "Higiene/Gasto pessoal", "Combustível", "Lazer", "Carro", "Saúde", "Dívidas", "Outros"];
   const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   const idMes = `${mesAtual.getMonth()}-${mesAtual.getFullYear()}`;
 
+  // --- CARREGAMENTO INICIAL (COM DELAY PARA SPLASH) ---
   useEffect(() => {
-    const load = async () => {
-      const g = await AsyncStorage.getItem('@finance_v31_gastos');
-      const e = await AsyncStorage.getItem('@finance_v31_entradas');
-      if (g) setGastos(JSON.parse(g));
-      if (e) setEntradasMensais(JSON.parse(e));
-    };
-    load();
+    async function preparar() {
+      try {
+        const g = await AsyncStorage.getItem('@finance_v31_gastos');
+        const e = await AsyncStorage.getItem('@finance_v31_entradas');
+        if (g) setGastos(JSON.parse(g));
+        if (e) setEntradasMensais(JSON.parse(e));
+
+        // Aguarda 2 segundos para mostrar sua Splash Screen personalizada
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (err) {
+        console.warn(err);
+      } finally {
+        setAppPronto(true);
+        await SplashScreen.hideAsync(); // Esconde a Splash e mostra o App
+      }
+    }
+    preparar();
   }, []);
 
   // --- FUNÇÕES DE LÓGICA ---
-
   const salvarGasto = async () => {
     if (!descricao.trim() || !valor) {
       Alert.alert("Atenção", "Preencha a descrição e o valor.");
       return;
     }
-
     const valorNumerico = parseFloat(valor.replace(',', '.'));
     if (isNaN(valorNumerico)) {
       Alert.alert("Erro", "Valor inválido.");
       return;
     }
-
     const novoGasto = {
       id: Date.now().toString(),
       descricao: descricao.trim(),
@@ -66,7 +80,6 @@ export default function App() {
       timestamp: mesAtual.getTime(),
       dataStr: mesAtual.toLocaleDateString('pt-BR')
     };
-
     const lista = [novoGasto, ...gastos];
     setGastos(lista);
     await AsyncStorage.setItem('@finance_v31_gastos', JSON.stringify(lista));
@@ -91,21 +104,8 @@ export default function App() {
     await AsyncStorage.setItem('@finance_v31_entradas', JSON.stringify(novasEntradas));
   };
 
-  // Função Calculadora para Entrada (Ex: =500+200)
   const processarEntradaMatematica = (input) => {
-    if (input.startsWith('=')) {
-      try {
-        const expressao = input.substring(1).replace(/,/g, '.');
-        const partes = expressao.split('+');
-        const soma = partes.reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0);
-        // Atualiza o estado com a string da conta, mas o cálculo reflete no saldo
-        atualizarEntrada(input); 
-      } catch (e) {
-        atualizarEntrada(input);
-      }
-    } else {
-      atualizarEntrada(input);
-    }
+    atualizarEntrada(input);
   };
 
   const finalizarCalculoEntrada = () => {
@@ -113,12 +113,11 @@ export default function App() {
     if (valorAtual.startsWith('=')) {
       const expressao = valorAtual.substring(1).replace(/,/g, '.');
       const total = expressao.split('+').reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0);
-      atualizarEntrada(total.toString());
+      atualizarEntrada(total.toFixed(2));
     }
   };
 
-  // --- CÁLCULOS DE INTERFACE ---
-
+  // --- PROCESSAMENTO DE DADOS ---
   const rawEntrada = entradasMensais[idMes] || '0';
   const valorEntradaNumerico = rawEntrada.startsWith('=') 
     ? rawEntrada.substring(1).replace(/,/g, '.').split('+').reduce((a, b) => a + (parseFloat(b) || 0), 0)
@@ -139,22 +138,8 @@ export default function App() {
 
   const maxValor = Math.max(...dadosGrafico.map(d => d.total), 1);
 
-  // --- COMPONENTES ---
-
-  const Grafico = () => (
-    <View style={styles.card}>
-      <Text style={styles.sectionTitle}>DISTRIBUIÇÃO POR CATEGORIA</Text>
-      <View style={styles.chartContainer}>
-        {dadosGrafico.length > 0 ? dadosGrafico.map(d => (
-          <View key={d.categoria} style={styles.barWrapper}>
-            <Text style={styles.barValue}>R${d.total.toFixed(0)}</Text>
-            <View style={[styles.bar, { height: (d.total / maxValor) * 70 + 5, backgroundColor: Cores.destaque }]} />
-            <Text style={styles.barLabel}>{d.categoria.substring(0, 3)}</Text>
-          </View>
-        )) : <Text style={styles.aviso}>Sem gastos registrados.</Text>}
-      </View>
-    </View>
-  );
+  // Trava a renderização enquanto a splash está ativa
+  if (!appPronto) return null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -207,7 +192,18 @@ export default function App() {
           </View>
         ) : (
           <View>
-            <Grafico />
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>DISTRIBUIÇÃO POR CATEGORIA</Text>
+              <View style={styles.chartContainer}>
+                {dadosGrafico.length > 0 ? dadosGrafico.map(d => (
+                  <View key={d.categoria} style={styles.barWrapper}>
+                    <Text style={styles.barValue}>R${d.total.toFixed(0)}</Text>
+                    <View style={[styles.bar, { height: (d.total / maxValor) * 70 + 5, backgroundColor: Cores.destaque }]} />
+                    <Text style={styles.barLabel}>{d.categoria.substring(0, 3)}</Text>
+                  </View>
+                )) : <Text style={styles.aviso}>Sem gastos registrados.</Text>}
+              </View>
+            </View>
             <Text style={styles.sectionTitle}>DETALHES DO HISTÓRICO</Text>
             {filtrados.map(item => (
               <View key={item.id} style={styles.itemGasto}>
@@ -220,7 +216,6 @@ export default function App() {
         )}
       </ScrollView>
 
-      {/* MENU INFERIOR ELEVADO */}
       <View style={styles.tabContainer}>
         <View style={styles.tabBar}>
           <TouchableOpacity style={styles.tabItem} onPress={() => setTela('Inicio')}>
